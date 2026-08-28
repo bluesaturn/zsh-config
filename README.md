@@ -58,6 +58,7 @@ Configured paths include, when available:
 - Android platform tools
 - Android emulator
 - Android command-line tools
+- Android build tools
 
 ### Zsh Completion System
 
