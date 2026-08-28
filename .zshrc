@@ -69,7 +69,7 @@ if [[ -d "$ANDROID_SDK_ROOT/build-tools" ]]; then
   unset _android_build_tools
 fi
 
-# Add important paths (in priority order)
+# Add important paths
 path_prepend "$HOME/.local/bin"
 path_prepend "$JAVA_HOME/bin"
 path_prepend "$HOME/Applications/MATLAB_R2024b.app/bin"
@@ -478,7 +478,7 @@ wgdown() {
   if [[ -z "$1" ]]; then
     local -a ifaces=(${(f)"$(wg show interfaces 2>/dev/null)"})
     if (( ${#ifaces[@]} == 0 )); then
-      eecho "🟢 No active WireGuard interfaces."
+      echo "🟢 No active WireGuard interfaces."
       return 0
     fi
 
@@ -575,7 +575,7 @@ _init_wireguard_completion() {
   compdef _wireguard_conf_completion wgup
   compdef _wireguard_conf_completion wgdown
   compdef _wireguard_show_completion wgshow
-  compdef _wireguard_show_completion wgrestart
+  compdef _wireguard_interface_completion wgrestart
   add-zsh-hook -d precmd _init_wireguard_completion  # Unregister after first run
 }
 
