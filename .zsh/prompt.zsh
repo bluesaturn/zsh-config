@@ -1,5 +1,8 @@
 # ─── Git Prompt ────────────────────────────────────────────────────
 
+# Zsh prompt expansion reference:
+# https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html
+
 # Example:
 #   git:(main +!?*)↓2/↑1
 #

@@ -9,6 +9,7 @@ python_env() {
   if command -v poetry &>/dev/null && [[ -f pyproject.toml ]]; then
     local env
     env=$(poetry env info --path 2>/dev/null)
+    
     if [[ -n "$env" ]]; then
       echo "[%B%F{208}poetry:%f%F{214} $(basename "$env")%f%b]"
     fi

@@ -7,11 +7,6 @@
 # - NVM loaded lazily
 # - Zsh completions cached
 # - Prompt with Git status and Python environment
-#
-# shellcheck shell=bash
-# shellcheck disable=SC2296,SC2206,SC2207,SC2016,SC2034,SC1091,SC1036
-# ^ zsh-specific expansions, arrays from command output, prompts, sourced files
-# Guide: https://zsh.sourceforge.io/Doc/Release/Prompt-Expansion.html
 
 # ─── Zsh Options ───────────────────────────────────────────────────
 
@@ -25,6 +20,8 @@ setopt share_history        # Share history between terminal sessions
 setopt inc_append_history
 setopt hist_ignore_space
 setopt hist_verify
+
+# ─── Modules ───────────────────────────────────────────────────────
 
 ZSH_CONFIG_DIR="$HOME/.zsh"
 

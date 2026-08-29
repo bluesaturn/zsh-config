@@ -67,7 +67,7 @@ Zsh completions are initialized through `compinit`.
 The `.zcompdump` completion cache is:
 
 - rebuilt when missing;
-- rebuilt when `.zshrc` is newer;
+- rebuilt when `.zshrc` or any configuration module is newer;
 - automatically removed when older than 30 days;
 - otherwise loaded using the faster cached path.
 
@@ -163,19 +163,9 @@ Activates `.venv` in the current directory when present.
 
 ### Safe Zsh Reloading
 
-The `reload` function validates `.zshrc` before replacing the current shell:
+The `reload` function validates `.zshrc` and all configuration modules before replacing the current shell.
 
-```sh
-reload
-```
-
-It first runs:
-
-```sh
-zsh -n ~/.zshrc
-```
-
-If the syntax is valid, a new Zsh process replaces the current one.
+If all files are valid, a new Zsh process replaces the current one.
 
 If validation fails, the existing working shell is preserved.
 
@@ -265,6 +255,7 @@ Before replacing an existing configuration, back it up:
 
 ```sh
 cp ~/.zshrc ~/.zshrc.backup
+mkdir -p ~/.zsh
 cp -R ~/.zsh ~/.zsh.backup
 ```
 

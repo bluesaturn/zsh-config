@@ -1,16 +1,24 @@
 # ─── Utility Functions ─────────────────────────────────────────────
 
-# Validate ~/.zshrc before replacing the current shell.
+# Validate ~/.zshrc and ~/.zsh/*.zsh before replacing the current shell.
 # If validation fails, keep the current working shell intact.
 reload() {
-  if zsh -n "$HOME/.zshrc"; then
-    echo "🔄 ~/.zshrc is valid. Reloading... (Last modified: $(date -r "$HOME/.zshrc" '+%Y-%m-%d %H:%M:%S'))"
-    # printf '\a' # enable for BEEP
-    exec zsh
-  else
-    echo "❌ ~/.zshrc contains errors: reload aborted." >&2
+  local file
+
+  if ! zsh -n "$HOME/.zshrc"; then
+    echo "❌ ~/.zshrc contains syntax errors." >&2
     return 1
   fi
+
+  for file in "$ZSH_CONFIG_DIR"/*.zsh(N); do
+    if ! zsh -n "$file"; then
+      echo "❌ Syntax error in: $file" >&2
+      return 1
+    fi
+  done
+
+  echo "🔄 Zsh configuration is valid. Reloading..."
+  exec zsh
 }
 
 f() {
@@ -138,12 +146,6 @@ pdfkeep() {
     fi
     qpdf "$input" --pages . "$pages_combined" -- "$output"
   fi
-}
-
-fix_compinit() {
-  echo "🧹 Rebuilding completion cache..."
-  rm -f "$ZCOMPDUMP"
-  compinit -d "$ZCOMPDUMP"
 }
 
 unexport() {

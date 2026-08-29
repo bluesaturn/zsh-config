@@ -13,8 +13,10 @@ refresh_old_compdump() {
   if [[ -f "$ZCOMPDUMP" ]]; then
     local lastmod
     lastmod=$(stat -f "%m" "$ZCOMPDUMP")
+
     local now
     now=$(date +%s)
+
     local age=$(( (now - lastmod) / 86400 )) # Age in days
 
     if (( age > 30 )); then
@@ -24,9 +26,28 @@ refresh_old_compdump() {
   fi
 }
 
+fix_compinit() {
+  echo "🧹 Rebuilding completion cache..."
+  rm -f "$ZCOMPDUMP"
+  compinit -d "$ZCOMPDUMP"
+}
+
 refresh_old_compdump
 
-if [[ ! -f "$ZCOMPDUMP" || "$ZCOMPDUMP" -ot "$HOME/.zshrc" ]]; then
+_rebuild_compdump=0
+
+if [[ ! -f "$ZCOMPDUMP" ]]; then
+  _rebuild_compdump=1
+else
+  for config_file in "$HOME/.zshrc" "$ZSH_CONFIG_DIR"/*.zsh(N); do
+    if [[ "$ZCOMPDUMP" -ot "$config_file" ]]; then
+      _rebuild_compdump=1
+      break
+    fi
+  done
+fi
+
+if (( _rebuild_compdump )); then
   compinit -d "$ZCOMPDUMP"
 else
   compinit -C -d "$ZCOMPDUMP"

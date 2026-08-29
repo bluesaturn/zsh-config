@@ -7,7 +7,6 @@
 # - `node`, `npm`, and `npx` load NVM and activate the `default` version.
 
 # NVM - Lazy Loading
-export NVM_DIR="$HOME/.nvm"
 
 load_nvm() {
   [ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && . "/opt/homebrew/opt/nvm/nvm.sh"

@@ -24,7 +24,7 @@ if [[ -d "$ANDROID_SDK_ROOT/build-tools" ]]; then
   unset _android_build_tools
 fi
 
-# Add important paths
+# Prepend paths; later entries have higher priority
 path_prepend "$HOME/.local/bin"
 path_prepend "$JAVA_HOME/bin"
 path_prepend "$HOME/Applications/MATLAB_R2024b.app/bin"
