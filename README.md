@@ -310,3 +310,7 @@ Optional sections may depend on software such as:
 - WireGuard
 
 Missing optional tools should generally not prevent Zsh from starting, although functionality associated with those tools will not be available.
+
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
