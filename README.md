@@ -256,15 +256,39 @@ drmi
 
 Clone or copy this repository to a local directory.
 
+The configuration consists of:
+
+* `.zshrc`, the main Zsh configuration file;
+* `.zsh/`, which contains the configuration modules loaded by `.zshrc`.
+
 Before replacing an existing configuration, back it up:
 
 ```sh
 cp ~/.zshrc ~/.zshrc.backup
+cp -R ~/.zsh ~/.zsh.backup
 ```
 
-Then install the repository version as `~/.zshrc`.
+### Copy the configuration
 
-After installation, validate it:
+Copy both `.zshrc` and the `.zsh` directory into your home directory:
+
+```sh
+cp .zshrc ~/.zshrc
+cp -R .zsh ~/.zsh
+```
+
+### Or use symbolic links
+
+If you prefer to keep the repository as the source of truth, you can create symbolic links instead:
+
+```sh
+ln -s /path/to/zsh-config/.zshrc ~/.zshrc
+ln -s /path/to/zsh-config/.zsh ~/.zsh
+```
+
+This allows changes made in the repository to take effect without copying the configuration files again.
+
+After installation, validate the configuration:
 
 ```sh
 zsh -n ~/.zshrc
