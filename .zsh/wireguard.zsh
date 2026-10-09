@@ -1,25 +1,107 @@
-# ─── WireGuard ─────────────────────────────────────────────────────
+# ─── WireGuard (macOS / Homebrew) ───────────────────────────────────
+
+_wireguard_config_dir=/opt/homebrew/etc/wireguard
+
+# Resolve logical configuration names, preserving explicitly supplied paths.
+_wireguard_config_arg() {
+  if [[ "$1" != */* && -f "$_wireguard_config_dir/$1.conf" ]]; then
+    REPLY="$_wireguard_config_dir/$1.conf"
+  else
+    REPLY="$1"
+  fi
+}
+
+# Return active physical interfaces in reply (macOS: e.g. utun4, utun5).
+# The output of `wg show interfaces` is space-separated, NOT line-separated.
+_wireguard_physical_interfaces() {
+  local output
+  output="$(sudo wg show interfaces 2>/dev/null)" || return 1
+  reply=( ${=output} )
+}
+
+# Return logical configuration names corresponding to active interfaces.
+# Only names with a matching .conf file are manageable via wg-quick here.
+_wireguard_active_configs() {
+  local -a physical configs
+  local name real
+  _wireguard_physical_interfaces || return 1
+  physical=( "${reply[@]}" )
+  configs=( "$_wireguard_config_dir"/*.conf(N:t:r) )
+  reply=()
+  for name in "${configs[@]}"; do
+    real="$(sudo cat "/var/run/wireguard/$name.name" 2>/dev/null)" || continue
+    if (( ${physical[(Ie)$real]} > 0 )); then
+      reply+=( "$name" )
+    fi
+  done
+}
+
+# Hide wg-quick's verbose output; provide a concise diagnostic upon failure.
+_wireguard_quiet_quick() {
+  local action="$1" target="$2" log line result
+  log="$(mktemp "${TMPDIR:-/tmp/}wg-quick.XXXXXXXX")" || {
+    print -u2 -- '✗ Impossibile creare il log temporaneo.'
+    return 1
+  }
+  # Authenticate before redirecting output so the password prompt stays visible.
+  if ! sudo -v; then
+    rm -f -- "$log"
+    print -u2 -- "✗ Autenticazione sudo non riuscita."
+    return 1
+  fi
+  sudo -n wg-quick "$action" "$target" >"$log" 2>&1
+  result=$?
+  if (( result != 0 )); then
+    # Prefer an actionable error to the routine [#] command trace.
+    line="$(awk '!/^\[#\]/ && !/^\[+\]/ && NF { last=$0 } END { print last }' "$log")"
+    [[ -n "$line" ]] || line="$(tail -n 1 "$log")"
+    print -u2 -- "✗ WireGuard ($action: ${target:t:r}): ${line:-errore sconosciuto} (codice $result)"
+  fi
+  rm -f -- "$log"
+  return "$result"
+}
 
 wgup() {
-  sudo wg-quick up "$1"
+  if (( $# != 1 )); then
+    print -u2 -- 'Uso: wgup <configurazione>'
+    return 1
+  fi
+  _wireguard_config_arg "$1"
+  local target="$REPLY"
+  if _wireguard_quiet_quick up "$target"; then
+    print -P -- "%F{green}✓%f WireGuard attivata: ${1:t:r}"
+  else
+    return 1
+  fi
 }
 
 wgdown() {
-  if [[ -z "$1" ]]; then
-    local -a ifaces=(${(f)"$(wg show interfaces 2>/dev/null)"})
-    if (( ${#ifaces[@]} == 0 )); then
-      echo "🟢 No active WireGuard interfaces."
+  local -a configs
+  local name target failed=0
+  if (( $# == 0 )); then
+    if ! _wireguard_active_configs; then
+      print -u2 -- '✗ Impossibile leggere le interfacce WireGuard attive.'
+      return 1
+    fi
+    configs=( "${reply[@]}" )
+    if (( ${#configs} == 0 )); then
+      print -- 'Nessuna configurazione WireGuard attiva da arrestare.'
       return 0
     fi
-
-    echo "🔻 Bringing down all WireGuard interfaces: ${ifaces[*]}"
-    for iface in "${ifaces[@]}"; do
-      echo "  - down $iface"
-      sudo wg-quick down "$iface"
-    done
   else
-    sudo wg-quick down "$1"
+    configs=( "$@" )
   fi
+
+  for name in "${configs[@]}"; do
+    _wireguard_config_arg "$name"
+    target="$REPLY"
+    if _wireguard_quiet_quick down "$target"; then
+      print -P -- "%F{green}✓%f WireGuard disattivata: ${name:t:r}"
+    else
+      failed=1
+    fi
+  done
+  return "$failed"
 }
 
 wgshow() {
@@ -27,86 +109,95 @@ wgshow() {
 }
 
 wgrestart() {
-  if [[ -z "$1" ]]; then
-    local -a ifaces=(${(f)"$(wg show interfaces 2>/dev/null)"})
-    if (( ${#ifaces[@]} == 0 )); then
-      echo "🟢 No active WireGuard interfaces."
+  local -a configs
+  local name target failed=0
+  if (( $# == 0 )); then
+    if ! _wireguard_active_configs; then
+      print -u2 -- '✗ Impossibile leggere le interfacce WireGuard attive.'
+      return 1
+    fi
+    configs=( "${reply[@]}" )
+    if (( ${#configs} == 0 )); then
+      print -- 'Nessuna configurazione WireGuard attiva da riavviare.'
       return 0
     fi
-
-    echo "🔁 Restarting all WireGuard interfaces: ${ifaces[*]}"
-    for iface in "${ifaces[@]}"; do
-      echo "  - restart $iface"
-      sudo wg-quick down "$iface" && sudo wg-quick up "$iface"
-    done
   else
-    echo "🔁 Restarting WireGuard interface: $1"
-    sudo wg-quick down "$1" && sudo wg-quick up "$1"
+    configs=( "$@" )
   fi
+
+  for name in "${configs[@]}"; do
+    _wireguard_config_arg "$name"
+    target="$REPLY"
+    if ! _wireguard_quiet_quick down "$target"; then
+      print -u2 -- "✗ Riavvio interrotto per ${name:t:r}: arresto non riuscito."
+      failed=1
+      continue
+    fi
+    if _wireguard_quiet_quick up "$target"; then
+      print -P -- "%F{green}✓%f WireGuard riavviata: ${name:t:r}"
+    else
+      failed=1
+    fi
+  done
+  return "$failed"
 }
 
 wgstatus() {
-  local -a ifaces=(${(f)"$(wg show interfaces 2>/dev/null)"})
-  if (( ${#ifaces[@]} == 0 )); then
-    echo "🟢 No active interfaces."
+  local -a physical configs
+  local name real iface label
+  if ! _wireguard_physical_interfaces; then
+    print -u2 -- '✗ Impossibile leggere lo stato WireGuard.'
+    return 1
+  fi
+  physical=( "${reply[@]}" )
+  if (( ${#physical} == 0 )); then
+    print -- 'Nessuna interfaccia WireGuard attiva.'
     return 0
   fi
 
-  for iface in "${ifaces[@]}"; do
-    echo "🔌 Interface: $iface"
-    sudo wg show "$iface" | awk '
-      BEGIN { peer=0 }
-      /^interface:/ { iface=$2 }
-      /^peer:/ {
-        if (peer) print ""
-        print "→ Peer: "$2
-        peer=1
-      }
-      /public key:/ { print "   🔑 PubKey: "$3 }
-      /endpoint:/   { print "   🌍 Endpoint: "$2 }
-      /latest handshake:/ { print "   🕓 Handshake: "$3 " " $4 " " $5 " " $6 " " $7 }
-      /transfer:/ { print "   📶 Transfer: "$2 " " $3 " / " $5 " " $6 }
-    '
-    echo ""
+  configs=( "$_wireguard_config_dir"/*.conf(N:t:r) )
+  for iface in "${physical[@]}"; do
+    label="$iface"
+    for name in "${configs[@]}"; do
+      real="$(sudo cat "/var/run/wireguard/$name.name" 2>/dev/null)" || continue
+      if [[ "$real" == "$iface" ]]; then
+        label="$name ($iface)"
+        break
+      fi
+    done
+    print -P -- "%F{green}●%f WireGuard attiva: $label"
   done
 }
 
-# Completion for wgup / wgdown: .conf files without extension
 _wireguard_conf_completion() {
   local -a configs
-  configs=(/opt/homebrew/etc/wireguard/*.conf(N:t:r))
-  _describe -t configs 'WireGuard Configs' configs
+  configs=( "$_wireguard_config_dir"/*.conf(N:t:r) )
+  _describe -t configs 'Configurazioni WireGuard' configs
 }
 
-# Completion for wgshow: subcommands + active interfaces
+_wireguard_active_completion() {
+  local -a configs
+  _wireguard_active_configs || return 1
+  configs=( "${reply[@]}" )
+  (( ${#configs} )) && _describe -t interfaces 'Configurazioni WireGuard attive' configs
+}
+
 _wireguard_show_completion() {
-
-  # Get active interfaces (e.g. wg0, wg_lan)
   local -a ifaces
-  ifaces=(${(f)"$(wg show interfaces 2>/dev/null)"})
-
-  local joined="${(j: :)ifaces}"
-
+  local output
+  output="$(wg show interfaces 2>/dev/null)"
+  ifaces=( ${=output} )
   _alternative \
     'subcmds:WireGuard subcommands:((interfaces\:Show\ active\ interfaces conf\:Show\ config dump\:Dump\ all allowed-ips\:Allowed\ IPs peers\:Peers endpoints\:Endpoints public-key\:Public\ key))' \
-    "interfaces:Active WireGuard interfaces:(( $joined ))"
+    "interfaces:Active WireGuard interfaces:(( ${(j: :)ifaces} ))"
 }
 
-_wireguard_interface_completion() {
-  local -a ifaces=(${(f)"$(wg show interfaces 2>/dev/null)"})
-  [[ ${#ifaces[@]} == 0 ]] && return 0
-  _describe -t interfaces 'Active WireGuard interfaces' ifaces
-}
-
-# Safely initialize completion after compinit
+# Initialize completion after compinit.
 autoload -Uz add-zsh-hook
-
 _init_wireguard_completion() {
   compdef _wireguard_conf_completion wgup
-  compdef _wireguard_conf_completion wgdown
+  compdef _wireguard_active_completion wgdown wgrestart
   compdef _wireguard_show_completion wgshow
-  compdef _wireguard_interface_completion wgrestart
-  add-zsh-hook -d precmd _init_wireguard_completion  # Unregister after first run
+  add-zsh-hook -d precmd _init_wireguard_completion
 }
-
 add-zsh-hook precmd _init_wireguard_completion
